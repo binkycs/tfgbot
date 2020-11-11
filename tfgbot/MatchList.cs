@@ -42,7 +42,7 @@ namespace tfgbot
             _matchList.Remove(user);
         }
 
-        public static void SendList()
+        public static async void SendList()
         {
             //get 10 man status channel
             var channel = _guild.GetTextChannel(Program._tenManStatusId);
@@ -53,12 +53,12 @@ namespace tfgbot
             embedBuilder.WithTitle("Current 10 man list:");
             embedBuilder.WithDescription("No one yet!");
 
-            var x = channel.SendMessageAsync("", false, embedBuilder.Build());
+            var x = await channel.SendMessageAsync("", false, embedBuilder.Build());
 
-            _listMessage = x.Result;
+            _listMessage = x;
         }
 
-        public static void UpdateList()
+        public static async void UpdateList()
         {
             //string listContent = "```Current 10 Man List:";
 
@@ -81,7 +81,7 @@ namespace tfgbot
             Embed embed = embedBuilder.Build();
 
 
-            _listMessage.ModifyAsync(x =>
+            await _listMessage.ModifyAsync(x =>
             {
                 x.Embed = embed;
             });

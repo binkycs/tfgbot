@@ -20,7 +20,7 @@ namespace tfgbot
 
             await svUser.AddRoleAsync(svRole);
 
-            AuditLog.AddLog("Assigned " + svRole.Name + " to " + svUser.Username);
+            AuditLog.AddLog("Assigned " + svRole.Name + " to " + svUser.Username + "#" + svUser.Discriminator);
         }
         public static async Task RemoveRole(ulong user, ulong role)
         {
@@ -29,7 +29,7 @@ namespace tfgbot
 
             await svUser.RemoveRoleAsync(svRole);
 
-            AuditLog.AddLog("Removed " + svRole.Name + " from " + svUser.Username);
+            AuditLog.AddLog("Removed " + svRole.Name + " from " + svUser.Username + "#" + svUser.Discriminator);
         }
     }
 }

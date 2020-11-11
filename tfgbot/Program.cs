@@ -1,15 +1,10 @@
-﻿using System;
+﻿using Discord;
+using Discord.WebSocket;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.NetworkInformation;
-using System.Reflection.Metadata.Ecma335;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using Discord;
-using Discord.Rest;
-using Discord.WebSocket;
 
 namespace tfgbot
 {
@@ -51,12 +46,21 @@ namespace tfgbot
         {
             new KeyValuePair<ulong, string>(612783689725640734, "global"),
             new KeyValuePair<ulong, string>(547218322534432770, "intermediate"),
-            new KeyValuePair<ulong, string>(547218262622994442, "beginner"),
+            new KeyValuePair<ulong, string>(547218262622994442, "silver"),
+            new KeyValuePair<ulong, string>(776203599340240897, "wood")
+        };
+
+        //Array of (RoleID, Corresponding Emote Name) for self-assigning specialized roles (tech support/health advisor)
+        internal KeyValuePair<ulong, string>[] _specializedRoleList = new KeyValuePair<ulong, string>[]
+        {
+            new KeyValuePair<ulong, string>(776216721480220702, "💻"),
+            new KeyValuePair<ulong, string>(776216774500286464, "💪")
         };
 
         //Constant Message IDs
         internal const ulong _rankAssignmentMessageId = 776128879625764884;
         internal const ulong _gameAssignmentMessageId = 776155071234048030;
+        internal const ulong _specialAssignmentMessageId = 776217030285852722;
 
 
         static DiscordSocketClient _client;
@@ -92,31 +96,29 @@ namespace tfgbot
             await Task.Delay(Timeout.Infinite);
         }
 
-        private Task ClientConnected()
+        private async Task ClientConnected()
         {
-            _guild = _client.GetGuild(_guildId);
+            await Task.Run(() =>
+            {
+                _guild = _client.GetGuild(_guildId);
 
-            MatchList.Initialize(_guild);
-            RoleAssigner.Initialize(_guild);
-
-            //todo: log what happened/be more descriptive
-            return _guild != null ? Task.CompletedTask : throw new Exception();
+                MatchList.Initialize(_guild);
+                RoleAssigner.Initialize(_guild);
+            });
         }
 
-        private Task MessageReceivedAsync(SocketMessage message)
+        private async Task MessageReceivedAsync(SocketMessage message)
         {
             if (message.Content == "!10man" && message.Channel.Id == 497237548221988864)
             {
                 var tenManRole = _guild.GetRole(_tenManRoleId);
 
-                var botMessage = message.Channel.SendMessageAsync("Setting up a 10 manner!\n" + tenManRole.Mention + "\ncheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!").Result;
+                var botMessage = await message.Channel.SendMessageAsync("Setting up a 10 manner!\n" + tenManRole.Mention + "\ncheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!");
 
                 _lastBotTenManMessageId = botMessage.Id;
 
                 MatchList.SendList();
             }
-
-            return Task.CompletedTask;
         }
 
         private async Task UserJoinedAsync(SocketGuildUser user)
@@ -130,15 +132,15 @@ namespace tfgbot
         {
             //add 10 man tag
             if (channel.Id == 547217573461360652)
+            {
                 await RoleAssigner.AssignRole(reaction.UserId, _tenManRoleId);
-
+            }
             //visitor removal/member role addition
             else if (channel.Id == 545752468407975946)
             {
                 if (reaction.Emote.Name == "👍")
                     await RoleAssigner.RemoveRole(reaction.UserId, _visitorRoleId);
             }
-
             //ah it's for the 10man! :)
             else if (reaction.MessageId == _lastBotTenManMessageId)
             {
@@ -146,26 +148,30 @@ namespace tfgbot
                 MatchList.AddToList(user);
                 MatchList.UpdateList();
             }
-
             //rank/skill level assignment
             else if (reaction.MessageId == _rankAssignmentMessageId)
             {
                 var rolePair = FindRole(_rankRoleList, reaction.Emote.Name);
                 if (rolePair.Key == 0)
                     return;
-
                 await RoleAssigner.AssignRole(reaction.UserId, rolePair.Key);
             }
-
             //user is adding a game role to their profile :)
             else if (reaction.MessageId == _gameAssignmentMessageId)
             {
-
                 var rolePair = FindRole(_gameRoleList, reaction.Emote.Name);
                 if (rolePair.Key == 0)
                     return;
+                await RoleAssigner.AssignRole(reaction.UserId, rolePair.Key);
+            }
+            //user is adding a specialized role (tech support/health advisor)
+            else if (reaction.MessageId == _specialAssignmentMessageId)
+            {
+                var rolePair = FindRole(_specializedRoleList, reaction.Emote.Name);
+                if (rolePair.Key == 0)
+                    return;
 
-                await RoleAssigner.AssignRole(reaction.UserId, rolePair.Key);                                
+                await RoleAssigner.AssignRole(reaction.UserId, rolePair.Key);
             }
         }
 
@@ -176,7 +182,6 @@ namespace tfgbot
             {
                 await RoleAssigner.RemoveRole(reaction.UserId, _tenManRoleId);
             }
-
             //check if rules updoot got removed, give visitor role again
             else if (channel.Id == 545752468407975946)
             {
@@ -186,7 +191,6 @@ namespace tfgbot
                 await RoleAssigner.AssignRole(reaction.UserId, _visitorRoleId);
                 await RoleAssigner.RemoveRole(reaction.UserId, _tenManRoleId);
             }
-
             //someone's backing out of 10 man :(
             else if (channel.Id == _tenManChatId && reaction.MessageId == _lastBotTenManMessageId)
             {
@@ -195,7 +199,6 @@ namespace tfgbot
                 MatchList.RemoveFromList(user);
                 MatchList.UpdateList();
             }
-
             //rank/skill level removal
             else if (reaction.MessageId == _rankAssignmentMessageId)
             {
@@ -205,11 +208,19 @@ namespace tfgbot
 
                 await RoleAssigner.RemoveRole(reaction.UserId, rolePair.Key);
             }
-
             //user is removing a game role from their profile :(
             else if (reaction.MessageId == _gameAssignmentMessageId)
             {
                 var rolePair = FindRole(_gameRoleList, reaction.Emote.Name);
+                if (rolePair.Key == 0)
+                    return;
+
+                await RoleAssigner.RemoveRole(reaction.UserId, rolePair.Key);
+            }
+            //user is adding a specialized role (tech support/health advisor)
+            else if (reaction.MessageId == _specialAssignmentMessageId)
+            {
+                var rolePair = FindRole(_specializedRoleList, reaction.Emote.Name);
                 if (rolePair.Key == 0)
                     return;
 
