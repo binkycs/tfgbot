@@ -1,11 +1,9 @@
-﻿using Discord;
-using Discord.WebSocket;
-using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-
+using System.Collections.Generic;
+using Discord;
+using Discord.WebSocket;
 namespace tfgbot
 {
     //TODO: Clean up 10 man setup

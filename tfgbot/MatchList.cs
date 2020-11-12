@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
-using System.Text;
+﻿using System.Collections.Generic;
 using Discord;
-using Discord.Net;
 using Discord.Rest;
 using Discord.WebSocket;
 
