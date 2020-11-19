@@ -1,47 +1,41 @@
-﻿using System.Collections.Generic;
-using Discord;
+﻿using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace tfgbot
 {
-    class MatchList
+    internal class MatchList
     {
-        private static List<SocketGuildUser> _matchList = new List<SocketGuildUser>();
+        private static readonly List<SocketGuildUser> MatchUsers = new List<SocketGuildUser>();
         static RestUserMessage _listMessage;
         static SocketGuild _guild;
-
-        internal static ulong ListMessageId
-        {
-            get { return _listMessage == null ? 0 : _listMessage.Id; }
-        }
 
         public static void Initialize(SocketGuild guild)
         {
             _guild = guild;
         }
 
-        //
-        // Summary:
-        //     Returns true if list is full after adding user
         public static void AddToList(SocketGuildUser user)
         {
-            if (_matchList.Count == 10)
+            if (MatchUsers.Count == 10)
                 return;
-            if (_matchList.Contains(user))
+            if (MatchUsers.Contains(user))
                 return;
 
-            _matchList.Add(user);
+            MatchUsers.Add(user);
         }
+
         public static void RemoveFromList(SocketGuildUser user)
         {
-            _matchList.Remove(user);
+            MatchUsers.Remove(user);
         }
 
         public static async void SendList()
         {
             //get 10 man status channel
-            var channel = _guild.GetTextChannel(Program._tenManStatusId);
+            var channel = _guild.GetTextChannel(Program.TenManStatusId);
 
             var embedBuilder = new EmbedBuilder();
 
@@ -49,21 +43,19 @@ namespace tfgbot
             embedBuilder.WithTitle("Current 10 man list:");
             embedBuilder.WithDescription("No one yet!");
 
-            var x = await channel.SendMessageAsync("", false, embedBuilder.Build());
+            var x = await channel.SendMessageAsync("", false, embedBuilder.Build()).ConfigureAwait(true);
 
             _listMessage = x;
         }
 
-        public static async void UpdateList()
+        public static Task UpdateListAsync()
         {
-            //string listContent = "```Current 10 Man List:";
+            var listContent = "";
 
-            string listContent = "";
-
-            for (int i = 0; i < _matchList.Count; i++)
+            for (var i = 0; i < MatchUsers.Count; i++)
             {
-                string name = _matchList[i].Nickname ?? _matchList[i].Username;
-                listContent += "\n" + (i + 1) + ". " + name;
+                var name = MatchUsers[i].Nickname ?? MatchUsers[i].Username;
+                listContent += $"\n{(i + 1)}. {name}";
             }
 
             listContent = listContent.Trim();
@@ -74,12 +66,9 @@ namespace tfgbot
             embedBuilder.WithTitle("Current 10 man list:");
             embedBuilder.WithDescription(listContent);
 
-            Embed embed = embedBuilder.Build();
-
-
-            await _listMessage.ModifyAsync(x =>
+            return _listMessage.ModifyAsync(x =>
             {
-                x.Embed = embed;
+                x.Embed = embedBuilder.Build();
             });
         }
     }

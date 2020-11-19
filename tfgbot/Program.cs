@@ -1,52 +1,44 @@
-﻿using System.IO;
-using System.Threading;
+﻿using System;
+using System.IO;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using Discord;
 using Discord.WebSocket;
 using MongoDB.Driver;
-using System;
-using MongoDB.Bson;
-using System.Runtime.CompilerServices;
 
 namespace tfgbot
 {
-    //TODO: Clean up 10 man setup
-
-    class Program
+    internal class Program
     {
-        internal const string _tokenLocation = "token.txt";
-        internal const string _connectionStringLocation = "database.txt";
+        internal const string TokenLocation = "token.txt";
+        internal const string ConnectionStringLocation = "database.txt";
 
         //server ID
-        internal const ulong _guildId = 414212469771337738;
+        internal const ulong GuildId = 414212469771337738;
 
         //channel IDs
-        internal const ulong _tenManStatusId = 541710653857988658;
-        internal const ulong _tenManChatId = 497237548221988864;
+        internal const ulong TenManStatusId = 541710653857988658;
+        internal const ulong TenManChatId = 497237548221988864;
 
         //role IDs
-        internal const ulong _visitorRoleId = 617076228481875980;
-        internal const ulong _tenManRoleId = 616761979322892291;
+        internal const ulong VisitorRoleId = 617076228481875980;
+        internal const ulong TenManRoleId = 616761979322892291;
 
 
-        static DiscordSocketClient _discordClient;
-        static SocketGuild _guild;
+        private static DiscordSocketClient _discordClient;
+        private static SocketGuild _guild;
 
-        static MongoClient _mongoClient;
+        private static MongoClient _mongoClient;
 
-        static ulong _lastBotTenManMessageId;
-
-        static void Main()
-        {
-            new Program().MainAsync().GetAwaiter().GetResult();
-        }
+        private static ulong _lastBotTenManMessageId;
 
         public Program()
         {
             _discordClient = new DiscordSocketClient();
 
-            _mongoClient = new MongoClient(File.ReadAllText(_connectionStringLocation));
+            _mongoClient = new MongoClient(File.ReadAllText(ConnectionStringLocation));
+
+            _mongoClient = new MongoClient(File.ReadAllText(ConnectionStringLocation));
+            new Task(() => { });
 
             //_client.Log += LogAsync;
             //_client.Ready += ReadyAsync;
@@ -54,40 +46,56 @@ namespace tfgbot
             _discordClient.ReactionAdded += ReactionAddedAsync;
             _discordClient.ReactionRemoved += ReactionRemovedAsync;
             _discordClient.UserJoined += UserJoinedAsync;
-            _discordClient.Connected += ClientConnected;
+            _discordClient.Connected += ClientConnectedAsync;
+        }
+
+        private static void Main()
+        {
+            new Program().MainAsync().GetAwaiter().GetResult();
         }
 
         public async Task MainAsync()
         {
-            await _discordClient.LoginAsync(TokenType.Bot, File.ReadAllText(_tokenLocation));
+            await _discordClient.LoginAsync(TokenType.Bot, File.ReadAllText(TokenLocation)).ConfigureAwait(true);
 
-            await _discordClient.StartAsync();
+            await _discordClient.StartAsync().ConfigureAwait(true);
 
             // Block the program until it is closed.
-            await Task.Delay(Timeout.Infinite);
+            while (true)
+                if (Console.ReadLine() == "exit")
+                    break;
+
+            _discordClient.Dispose();
         }
 
-        private async Task ClientConnected()
+        private static Task ClientConnectedAsync()
         {
-            await Task.Run(() =>
+            return Task.Run(() =>
             {
-                _guild = _discordClient.GetGuild(_guildId);
+                _guild = _discordClient.GetGuild(GuildId);
 
                 MatchList.Initialize(_guild);
                 RoleAssigner.Initialize(_guild);
             });
         }
 
-        private async Task MessageReceivedAsync(SocketMessage message)
+        private static async Task MessageReceivedAsync(SocketMessage message)
         {
-            if (message.Content == "!10man" && message.Channel.Id == _tenManChatId)
+            if (message.Content != "!10man") return;
+
+            if (message.Channel.Id == TenManChatId)
             {
-                var tenManRole = _guild.GetRole(_tenManRoleId);
+                var tenManRole = _guild.GetRole(TenManRoleId);
 
 #if DEBUG
-                var botMessage = await message.Channel.SendMessageAsync("Setting up a 10 manner!\n" + /*tenManRole.Mention +*/ "\ncheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!");
+                var botMessage = await message.Channel
+                    .SendMessageAsync("Setting up a 10 manner!\nCheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!")
+                    .ConfigureAwait(true);
 #else
-                var botMessage = await message.Channel.SendMessageAsync("Setting up a 10 manner!\n" + tenManRole.Mention + "\ncheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!");
+                var botMessage = await message.Channel
+                    .SendMessageAsync(
+                        $"Setting up a 10 manner!\n{tenManRole.Mention}\ncheck the 10 Man Status Channel for the list! React to this message in order to be added to the list!")
+                    .ConfigureAwait(true);
 #endif
 
                 _lastBotTenManMessageId = botMessage.Id;
@@ -96,63 +104,77 @@ namespace tfgbot
             }
         }
 
-        private async Task UserJoinedAsync(SocketGuildUser user)
+        private static Task UserJoinedAsync(SocketGuildUser user)
         {
-            await RoleAssigner.AssignRole(user.Id, _visitorRoleId);
+            return RoleAssigner.AssignRoleAsync(user.Id, VisitorRoleId);
         }
 
-        private async Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, ISocketMessageChannel channel, SocketReaction reaction)
-        {
-            var dbRole = FindRoleFromMessageReaction(reaction);
-
-            if (dbRole == null)
-            {
-                if (reaction.MessageId == _lastBotTenManMessageId)
-                {
-                    var user = _guild.GetUser(reaction.UserId);
-                    MatchList.AddToList(user);
-                    MatchList.UpdateList();
-                }
-                return;
-            }
-
-            if (reaction.Emote.Name == dbRole.Emoji)
-            {
-                if (!string.IsNullOrEmpty(dbRole.RoleID))
-                    await RoleAssigner.AssignRole(reaction.UserId, ulong.Parse(dbRole.RoleID));
-                if (!string.IsNullOrEmpty(dbRole.RemovalRoleID))
-                    await RoleAssigner.RemoveRole(reaction.UserId, ulong.Parse(dbRole.RemovalRoleID));
-            }
-        }
-
-        private async Task ReactionRemovedAsync(Cacheable<IUserMessage, ulong> message, ISocketMessageChannel channel, SocketReaction reaction)
+        private static async Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, ISocketMessageChannel channel,
+            SocketReaction reaction)
         {
             var dbRole = FindRoleFromMessageReaction(reaction);
 
             if (dbRole == null)
             {
+                // ReSharper disable once InvertIf
                 if (reaction.MessageId == _lastBotTenManMessageId)
                 {
                     var user = _guild.GetUser(reaction.UserId);
-                    MatchList.RemoveFromList(user);
-                    MatchList.UpdateList();
+                    UpdateMatchList(user, true);
                 }
+
                 return;
             }
 
             if (reaction.Emote.Name == dbRole.Emoji)
             {
-                if (!string.IsNullOrEmpty(dbRole.RoleID))
-                    await RoleAssigner.RemoveRole(reaction.UserId, ulong.Parse(dbRole.RoleID));
-                if (!string.IsNullOrEmpty(dbRole.RemovalRoleID))
-                    await RoleAssigner.AssignRole(reaction.UserId, ulong.Parse(dbRole.RemovalRoleID));
+                if (!string.IsNullOrEmpty(dbRole.RoleId))
+                    await RoleAssigner.AssignRoleAsync(reaction.UserId, ulong.Parse(dbRole.RoleId)).ConfigureAwait(true);
+                if (!string.IsNullOrEmpty(dbRole.RemovalRoleId))
+                    await RoleAssigner.RemoveRoleAsync(reaction.UserId, ulong.Parse(dbRole.RemovalRoleId))
+                        .ConfigureAwait(true);
             }
         }
 
-        private Role FindRoleFromMessageReaction(SocketReaction reaction)
+        private static async Task ReactionRemovedAsync(Cacheable<IUserMessage, ulong> message, ISocketMessageChannel channel,
+            SocketReaction reaction)
+        {
+            var dbRole = FindRoleFromMessageReaction(reaction);
+            if (dbRole == null)
+            {
+                if (reaction.MessageId == _lastBotTenManMessageId)
+                {
+                    var user = _guild.GetUser(reaction.UserId);
+                    UpdateMatchList(user, false);
+                }
+
+                return;
+            }
+
+            if (reaction.Emote.Name == dbRole.Emoji)
+            {
+                if (!string.IsNullOrEmpty(dbRole.RoleId))
+                    await RoleAssigner.RemoveRoleAsync(reaction.UserId, ulong.Parse(dbRole.RoleId)).ConfigureAwait(true);
+                if (!string.IsNullOrEmpty(dbRole.RemovalRoleId))
+                    await RoleAssigner.AssignRoleAsync(reaction.UserId, ulong.Parse(dbRole.RemovalRoleId))
+                        .ConfigureAwait(true);
+            }
+        }
+
+        private static void UpdateMatchList(SocketGuildUser user, bool addUser)
+        {
+            if (addUser)
+                MatchList.AddToList(user);
+            else
+                MatchList.RemoveFromList(user);
+
+            MatchList.UpdateListAsync().ConfigureAwait(true);
+        }
+
+        private static Role FindRoleFromMessageReaction(SocketReaction reaction)
         {
             var roles = _mongoClient.GetDatabase("tfgbot").GetCollection<Role>("roles");
-            return roles.Find(y => y.MessageID == reaction.MessageId.ToString()).FirstOrDefault();
+            return roles.Find(y => y.MessageId == reaction.MessageId.ToString()).FirstOrDefault();
         }
     }
 }

@@ -5,21 +5,22 @@ using System.Text;
 
 namespace tfgbot
 {
-    class Role
+    internal class Role
     {
         [BsonId]
-        public MongoDB.Bson.ObjectId _id { get; set; }
+        // ReSharper disable once UnusedMember.Global
+        public MongoDB.Bson.ObjectId Id { get; set; }
 
         [BsonElement("messageid")]
-        public string MessageID { get; set; }
+        public string MessageId { get; set; }
 
         [BsonElement("roleid")]
-        public string RoleID { get; set; }
+        public string RoleId { get; set; }
 
         [BsonElement("emoji")]
         public string Emoji { get; set; }
 
         [BsonElement("removalid")]
-        public string RemovalRoleID { get; set; }
+        public string RemovalRoleId { get; set; }
     }
 }
