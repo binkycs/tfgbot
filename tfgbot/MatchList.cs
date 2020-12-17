@@ -8,7 +8,7 @@ namespace tfgbot
 {
     internal class MatchList
     {
-        private static readonly List<SocketGuildUser> MatchUsers = new List<SocketGuildUser>();
+        private static readonly List<string> MatchUsers = new List<string>();
         static RestUserMessage _listMessage;
         static SocketGuild _guild;
 
@@ -19,17 +19,19 @@ namespace tfgbot
 
         public static void AddToList(SocketGuildUser user)
         {
+            string username = user.Nickname ?? user.Username;
             if (MatchUsers.Count == 10)
                 return;
-            if (MatchUsers.Contains(user))
+            if (MatchUsers.Contains(username))
                 return;
 
-            MatchUsers.Add(user);
+            MatchUsers.Add(username);
         }
 
         public static void RemoveFromList(SocketGuildUser user)
         {
-            MatchUsers.Remove(user);
+            string username = user.Nickname ?? user.Username;
+            MatchUsers.Remove(username);
         }
 
         public static async void SendList()
@@ -54,8 +56,7 @@ namespace tfgbot
 
             for (var i = 0; i < MatchUsers.Count; i++)
             {
-                var name = MatchUsers[i].Nickname ?? MatchUsers[i].Username;
-                listContent += $"\n{(i + 1)}. {name}";
+                listContent += $"\n{(i + 1)}. {MatchUsers[i]}";
             }
 
             listContent = listContent.Trim();

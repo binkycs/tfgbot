@@ -15,18 +15,29 @@ namespace tfgbot
             var svUser = _guild.GetUser(user);
             var svRole = _guild.GetRole(role);
 
-            await svUser.AddRoleAsync(svRole).ConfigureAwait(true);
-
-            AuditLog.AddLog("Assigned " + svRole.Name + " to " + svUser.Username + "#" + svUser.Discriminator);
+            await AssignRoleAsync(svUser, svRole).ConfigureAwait(true);
         }
+
+        public static async Task AssignRoleAsync(SocketGuildUser user, SocketRole role)
+        {
+            await user.AddRoleAsync(role).ConfigureAwait(true);
+
+            AuditLog.AddLog($"Assigned {role.Name} to {user.Username}#{user.Discriminator}");
+        }
+
         public static async Task RemoveRoleAsync(ulong user, ulong role)
         {
             var svUser = _guild.GetUser(user);
             var svRole = _guild.GetRole(role);
 
-            await svUser.RemoveRoleAsync(svRole).ConfigureAwait(true);
+            await RemoveRoleAsync(svUser, svRole).ConfigureAwait(true);
+        }
 
-            AuditLog.AddLog("Removed " + svRole.Name + " from " + svUser.Username + "#" + svUser.Discriminator);
+        public static async Task RemoveRoleAsync(SocketGuildUser user, SocketRole role)
+        {
+            await user.RemoveRoleAsync(role).ConfigureAwait(true);
+
+            AuditLog.AddLog($"Removed {role.Name} from {user.Username}#{user.Discriminator}");
         }
     }
 }
